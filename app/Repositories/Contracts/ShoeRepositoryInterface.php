@@ -4,7 +4,7 @@ namespace App\Repositories\Contracts;
 
 interface ShoeRepositoryInterface
 {
-    public function getPopularShoe($limit);
+    public function getPopularShoes($limit);
 
     public function getAllNewShoes();
 

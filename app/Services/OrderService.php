@@ -7,8 +7,10 @@ use App\Repositories\Contracts\CategoryRepositoryInterface;
 use App\Repositories\Contracts\OrderRepositoryInterface;
 use App\Repositories\Contracts\PromoCodeRepositoryInterface;
 use App\Repositories\Contracts\ShoeRepositoryInterface;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+
 use Illuminate\Support\Facades\Session;
 
 class OrderService
@@ -17,7 +19,7 @@ class OrderService
     protected $promoCodeRepository;
     protected $orderRepository;
     protected $shoeRepository;
- 
+
     public function __construct(
         CategoryRepositoryInterface $categoryRepository,
         PromoCodeRepositoryInterface $promoCodeRepository,
@@ -34,7 +36,6 @@ class OrderService
     {
         $orderData = [
             'shoe_size' => $data['shoe_size'],
-            'size_id' => $data['size_id'],
             'shoe_id' => $data['shoe_id'],
         ];
 
@@ -44,9 +45,19 @@ class OrderService
     public function getOrderDetails()
     {
         $orderData = $this->orderRepository->getOrderDataFromSession();
+
+        if (empty($orderData) || !isset($orderData['shoe_id'])) {
+            return [
+                'orderData' => null,
+                'shoe' => null,
+            ];
+        }
+
         $shoe = $this->shoeRepository->find($orderData['shoe_id']);
 
-        $quantity = isset($orderData['quantity']) ? $orderData['quantity'] : 1;
+        // Default quantity = 1
+        $quantity = $orderData['quantity'] ?? 1;
+
         $subTotalAmount = $shoe->price * $quantity;
 
         $taxRate = 0.11;
@@ -54,12 +65,18 @@ class OrderService
 
         $grandTotalAmount = $subTotalAmount + $totalTax;
 
+        // Tambahin ke array orderData biar konsisten dipakai di step berikutnya
+        $orderData['quantity'] = $quantity;
         $orderData['sub_total_amount'] = $subTotalAmount;
         $orderData['total_tax'] = $totalTax;
         $orderData['grand_total_amount'] = $grandTotalAmount;
 
+        // simpan ulang ke session
+        $this->orderRepository->saveToSession($orderData);
+
         return compact('orderData', 'shoe');
     }
+
 
     public function applyPromoCode(string $code, int $subTotalAmount)
     {
@@ -82,12 +99,12 @@ class OrderService
 
     public function saveBookingTransaction(array $data)
     {
-     $this->orderRepository->saveToSession($data);
+        $this->orderRepository->saveToSession($data);
     }
 
     public function updateCustomerData(array $data)
     {
-     $this->orderRepository->updateSessionData($data);
+        $this->orderRepository->updateSessionData($data);
     }
 
     public function paymentConfirm(array $validated)
@@ -97,48 +114,53 @@ class OrderService
 
         try {
             DB::transaction(function () use ($validated, &$productTransactionId, $orderData) {
-                
+
                 // Simpan bukti pembayaran (jika ada)
-                if (isset($validated['proof'])) {
+                if (isset($validated['proof']) && $validated['proof'] instanceof \Illuminate\Http\UploadedFile) {
                     $proofPath = $validated['proof']->store('proofs', 'public');
                     $validated['proof'] = $proofPath;
                 }
 
                 // Lengkapi data transaksi dengan data dari session
-                $validated['name'] = $orderData['name'];
-                $validated['email'] = $orderData['email'];
-                $validated['phone'] = $orderData['phone'];
-                $validated['address'] = $orderData['address'];
-                $validated['post_code'] = $orderData['post_code'];
-                $validated['city'] = $orderData['city'];
-                $validated['quantity'] = $orderData['quantity'];
-                $validated['sub_total_amount'] = $orderData['sub_total_amount'];
-                $validated['grand_total_amount'] = $orderData['grand_total_amount'];
-                $validated['discount_amount'] = $orderData['total_discount_amount'];
-                $validated['promo_code_id'] = $orderData['promo_code_id'] ?? null;
-                $validated['shoe_id'] = $orderData['shoe_id'];
-                $validated['shoe_size'] = $orderData['size_id'];
+                $validated['name']              = $orderData['name'] ?? null;
+                $validated['email']             = $orderData['email'] ?? null;
+                $validated['phone']             = $orderData['phone'] ?? null;
+                $validated['address']           = $orderData['address'] ?? null;
+                $validated['post_code']         = $orderData['post_code'] ?? null;
+                $validated['city']              = $orderData['city'] ?? null;
+                $validated['quantity']          = $orderData['quantity'] ?? 1;
+                $validated['sub_total_amount']  = $orderData['sub_total_amount'] ?? 0;
+                $validated['grand_total_amount'] = $orderData['grand_total_amount'] ?? 0;
+                $validated['discount_amount']   = $orderData['discount_amount'] ?? 0;
+                $validated['shoe_id']           = $orderData['shoe_id'] ?? null;
+                $validated['shoe_size']         = $orderData['shoe_size'] ?? null;
 
-                $validated['is_paid'] = false;
+                $validated['is_paid']           = false;
+                $validated['booking_trx_id']    = ProductTransaction::generateUniqueTrxId();
 
-                $validated['booking_trx_id'] = ProductTransaction::generateUniqueTrxId();
+                $validated['user_id']           = Auth::user()->id;
 
-                // Buat transaksi baru
+
+                // Simpan ke DB
                 $newTransaction = $this->orderRepository->createTransaction($validated);
-
                 $productTransactionId = $newTransaction->id;
             });
 
             return $productTransactionId;
-
         } catch (\Exception $e) {
             Log::error('Error in payment confirmation: ' . $e->getMessage());
-            session()->flash('error', $e->getMessage());
+            session()->flash('error', 'Terjadi kesalahan saat konfirmasi pembayaran.');
             return null;
         }
-
-        return $productTransactionId;
     }
 
+    public function getUserOrders(int $userId, int $perPage = 10)
+    {
+        return $this->orderRepository->getOrdersByUser($userId, $perPage);
+    }
 
+    public function getUserOrderDetail(int $userId, int $orderId)
+    {
+        return $this->orderRepository->getOrderByUserAndId($userId, $orderId);
+    }
 }

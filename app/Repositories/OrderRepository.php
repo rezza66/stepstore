@@ -2,31 +2,31 @@
 
 namespace App\Repositories;
 
-use App\Models\BookingTransaction;
 use App\Models\ProductTransaction;
 use App\Repositories\Contracts\OrderRepositoryInterface;
-use Illuminate\Support\Facades\Session;
 
 class OrderRepository implements OrderRepositoryInterface
 {
-    // Membuat transaksi baru
+    // Simpan transaksi baru ke DB
     public function createTransaction(array $data)
     {
         return ProductTransaction::create($data);
     }
 
-    // Mencari transaksi berdasarkan booking_trx_id dan nomor HP
+    // Cari transaksi berdasarkan booking_trx_id + phone
     public function findByTrxIdAndPhoneNumber($bookingTrxId, $phoneNumber)
     {
         return ProductTransaction::where('booking_trx_id', $bookingTrxId)
-            ->where('phone_number', $phoneNumber)
+            ->where('phone', $phoneNumber) // konsisten dengan request
             ->first();
     }
 
-    // Simpan data order ke session
+    // Simpan data order ke session (merge dengan data lama)
     public function saveToSession(array $data)
     {
-        Session::put('orderData', $data);
+        $orderData = session('orderData', []);
+        $orderData = array_merge($orderData, $data);
+        session(['orderData' => $orderData]);
     }
 
     // Ambil data order dari session
@@ -35,11 +35,25 @@ class OrderRepository implements OrderRepositoryInterface
         return session('orderData', []);
     }
 
-    // Update data order di session
+    // Update data order di session (sama dengan saveToSession)
     public function updateSessionData(array $data)
     {
-        $orderData = session('orderData', []);
-        $orderData = array_merge($orderData, $data);
-        session(['orderData' => $orderData]);
+        $this->saveToSession($data);
+    }
+
+    // Ambil semua pesanan milik user tertentu
+    public function getOrdersByUser($userId, $perPage = 10)
+    {
+        return ProductTransaction::where('user_id', $userId)
+            ->latest()
+            ->paginate($perPage);
+    }
+
+    // Ambil detail pesanan milik user tertentu
+    public function getOrderByUserAndId($userId, $orderId)
+    {
+        return ProductTransaction::where('user_id', $userId)
+            ->where('id', $orderId)
+            ->first();
     }
 }

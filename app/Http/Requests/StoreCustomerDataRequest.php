@@ -22,11 +22,13 @@ class StoreCustomerDataRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
-            'phone' => ['required', 'string', 'max:255'],
-            'city' => ['required', 'string', 'max:255'],
-            'post_code' => ['required', 'string', 'max:255'],
-            'address' => ['required', 'string',],
+            'name'      => ['sometimes', 'required', 'string', 'max:255'],
+            'email'     => ['sometimes', 'required', 'email', 'max:255'],
+            'quantity'  => ['sometimes', 'required', 'integer', 'min:1'],
+            'phone'     => ['sometimes', 'required', 'string', 'max:20'],
+            'address'   => ['sometimes', 'required', 'string'],
+            'city'      => ['sometimes', 'required', 'string', 'max:255'],
+            'post_code' => ['sometimes', 'required', 'string', 'max:10'],
         ];
     }
 }

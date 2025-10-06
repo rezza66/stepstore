@@ -11,9 +11,9 @@ class FrontController extends Controller
 {
     protected $frontService;
 
-    public function __construct(FrontService $frontService)
+    public function __construct()
     {
-        $this->frontService = $frontService;
+        $this->frontService = new FrontService();
     }
 
     // Route: GET /
@@ -26,12 +26,26 @@ class FrontController extends Controller
     // Route: GET /details/{shoe:slug}
     public function details(Shoe $shoe)
     {
+        $shoe->load(['photos', 'sizes', 'category', 'brand']);
         return view('front.details', compact('shoe'));
     }
 
     // Route: GET /browse/{category:slug}
     public function category(Category $category)
     {
-        return view('front.category', compact('category'));
+        $shoes = Shoe::where('category_id', $category->id)
+            ->with('brand')
+            ->paginate(12);
+
+        return view('front.category', compact('category', 'shoes'));
+    }
+
+    public function newShoes()
+    {
+        $newShoes = Shoe::with(['category', 'brand'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(12);
+
+        return view('front.new-shoes', compact('newShoes'));
     }
 }

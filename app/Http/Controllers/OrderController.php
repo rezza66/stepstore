@@ -15,7 +15,7 @@ class OrderController extends Controller
     //
     protected $orderService;
 
-    public function __construct($orderService)
+    public function __construct(OrderService $orderService)
     {
         $this->orderService = $orderService;
     }
@@ -24,11 +24,14 @@ class OrderController extends Controller
     {
         $validated = $request->validated();
 
+        // Tambahkan shoe_id dari parameter route
         $validated['shoe_id'] = $shoe->id;
 
+        // Simpan ke session
         $this->orderService->beginOrder($validated);
 
-        return redirect()->route('front.booking', $shoe->slug);
+        // Langsung redirect ke booking
+        return redirect()->route('front.booking');
     }
 
     public function booking()
@@ -45,12 +48,24 @@ class OrderController extends Controller
 
     public function saveCustomerData(StoreCustomerDataRequest $request)
     {
+        // Ambil data validasi (hanya field yang dikirim)
         $validated = $request->validated();
 
+        // Simpan/merge ke session
         $this->orderService->updateCustomerData($validated);
 
+        // Cek data yang sudah ada di session
+        $orderData = session('orderData', []);
+
+        // Kalau name & email belum ada → berarti user masih di step pertama
+        if (!isset($orderData['address']) || !isset($orderData['phone'])) {
+            return redirect()->route('front.customer_data'); // ke form customer_data
+        }
+
+        // Kalau semua data customer sudah lengkap → lanjut ke payment
         return redirect()->route('front.payment');
     }
+
 
     public function payment()
     {
@@ -64,14 +79,14 @@ class OrderController extends Controller
         $productTransactionId = $this->orderService->paymentConfirm($validated);
 
         if ($productTransactionId) {
-            return redirect()->route('front.order_finished ', $productTransactionId);
+            return redirect()->route('front.order_finished', $productTransactionId);
         }
 
-        return redirect()->route('front.index')->withErrors(['error' => 'Payment failed. Please try again.']);
+        return redirect()->route('front.payment')->withErrors(['error' => 'Payment failed. Please try again.']);
     }
 
     public function orderFinished(ProductTransaction $productTransaction)
     {
-        dd($productTransaction);
+        return view('order.finished', compact('productTransaction'));
     }
 }

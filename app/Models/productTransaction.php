@@ -12,6 +12,7 @@ class productTransaction extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'user_id',           
         'name',
         'phone',
         'email',
@@ -30,26 +31,40 @@ class productTransaction extends Model
         'proof',
     ];
 
+    /**
+     * Generate unique booking transaction ID
+     */
     public static function generateUniqueTrxId()
     {
-        $prifx = 'SS';
+        $prefix = 'SS';
         do {
-            $randomString = $prifx . mt_rand(1000, 9999);
+            $randomString = $prefix . mt_rand(1000, 9999);
         } while (self::where('booking_trx_id', $randomString)->exists());
 
         return $randomString;
     }
 
+    /**
+     * Relasi ke PromoCode
+     */
     public function promoCode(): BelongsTo
     {
-        return $this->belongsTo(promoCode::class, 'promo_code_id');
+        return $this->belongsTo(PromoCode::class, 'promo_code_id');
     }
 
+    /**
+     * Relasi ke Shoe
+     */
     public function shoe(): BelongsTo
     {
         return $this->belongsTo(Shoe::class, 'shoe_id');
     }
 
-
-
+    /**
+     * Relasi ke User
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

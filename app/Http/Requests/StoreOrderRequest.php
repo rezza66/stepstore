@@ -20,11 +20,10 @@ class StoreOrderRequest extends FormRequest
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
-    {
-        return [
-            //
-            'shoe_size' => ['required', 'string', 'max:255'],
-            'shoe_id' => ['required', 'integer', 'min:1'],
-        ];
-    }
+{
+    return [
+        'shoe_size' => ['required', 'string', 'max:255'],
+    ];
+}
+
 }
