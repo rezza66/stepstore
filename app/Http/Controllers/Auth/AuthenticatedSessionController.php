@@ -27,12 +27,12 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
-        $user = Auth::user();
+        // $user = Auth::user();
 
-        // Jika admin arahkan ke Filament
-        if ($user->role === 'admin') {
-            return redirect('/admin'); // langsung, bukan intended
-        }
+        // // Jika admin arahkan ke Filament
+        // if ($user->role === 'admin') {
+        //     return redirect('/admin'); // langsung, bukan intended
+        // }
 
         // Default user biasa
         return redirect()->route('front.index');
